@@ -63,7 +63,7 @@ def make_flat(orig_files, bias, dark, exptime):
 
 def align_images(obj_images, ref_stars=[]):
     all_sources = []
-    n_rows = math.floor(math.sqrt(len(obj_images) / 2))
+    n_rows = max([math.floor(math.sqrt(len(obj_images) / 2)), 1])
     n_cols = math.ceil(len(obj_images) / n_rows)
     for ii in range(len(obj_images)):
         im = obj_images[ii]
@@ -143,7 +143,7 @@ def align_images(obj_images, ref_stars=[]):
         obj_images[ii] = tmp[:, :, 0]
 
 
-attributes = ["DATE-OBS", "TELESCOP", "OBJECT", "IMAGETYP", "EXPTIME", "RA", "DEC"]
+attributes = ["NAXIS", "NAXIS1", "NAXIS2", "DATE-OBS", "TELESCOP", "OBJECT", "IMAGETYP", "EXPTIME", "RA", "DEC"]
 attrs_to_save = ["DATE-OBS", "TELESCOP", "INSTRUME", "OBJECT", "PROG-ID", "OBSERVAT", "DETECTOR"]
 fits_files = []
 bias_nums = []
@@ -164,25 +164,23 @@ print(f"{len(fits_names)} FITS files found in {args.dir}")
 i = 0
 for f in fits_names:
     img = fits.open(f)
-    fits_files.append(img)
-    i = i + 1
-    print(f"{i}) {f}:")
     for j in range(len(img)):
         hdu = img[j]
+        fits_files.append([hdu])
+        i = i + 1
         if j == 0:
-            print("  Primary HDU:")
+            print(f"{f} [Primary HDU]:")
         else:
-            print(f"  HDU{j}:")
+            print(f"{f}  [HDU{j}]:")
         for attr in attributes:
             if attr in hdu.header:
                 print(f"\t    {attr} = {hdu.header[attr]}")
-    if "IMAGETYP" in img[0].header and (img[0].header["IMAGETYP"] == "bias" or img[0].header["IMAGETYP"] == "Bias Frame"):
-        bias_nums.append(i)
-    if "OBJECT" in img[0].header and img[0].header["OBJECT"] == "sunsky":
-        flat_nums.append(i)
-    if "IMAGETYP" in img[0].header and img[0].header["IMAGETYP"] == "Dark Frame":
-        dark_nums.append(i)
-print("\n\nWarning: ONLY Primary HDUs will be processed in the next steps!")
+        if "IMAGETYP" in hdu.header and (hdu.header["IMAGETYP"] == "bias" or hdu.header["IMAGETYP"] == "Bias Frame"):
+            bias_nums.append(i)
+        if ("OBJECT" in hdu.header and (hdu.header["OBJECT"] == "sunsky" or hdu.header["OBJECT"] == "flat")) or ("IMAGETYP" in hdu.header and hdu.header["IMAGETYP"] == "flat"):
+            flat_nums.append(i)
+        if "IMAGETYP" in hdu.header and (hdu.header["IMAGETYP"] == "Dark Frame" or hdu.header["IMAGETYP"] == "dark"):
+            dark_nums.append(i)
 
 print(f"\nFound {len(bias_nums)} BIAS frames: ", end="")
 for _ in bias_nums:
@@ -337,7 +335,8 @@ if len(obj_files) > 0:
     if len(z) > 0:
         obj_header["Z"] = sum(z) / len(z)
 
-    align_images(obj_images)
+    if len(obj_images) > 1:
+        align_images(obj_images)
 
     numpy.sum(obj_images, axis=0, out=obj_data)
 
@@ -345,6 +344,8 @@ if len(obj_files) > 0:
 
     print("Result file:")
     filename = input()
+    if filename == "":
+        filename = "result.fits"
     if not (filename.endswith(".fts") or filename.endswith(".fits") or filename.endswith(".fit")):
         filename = filename + ".fits"
     fits.HDUList([obj_hdu]).writeto(args.dir + "/aimp/" + filename, overwrite=True)
