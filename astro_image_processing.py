@@ -169,9 +169,9 @@ for f in fits_names:
         fits_files.append([hdu])
         i = i + 1
         if j == 0:
-            print(f"{f} [Primary HDU]:")
+            print(f"{i}) {f} [Primary HDU]:")
         else:
-            print(f"{f}  [HDU{j}]:")
+            print(f"{i}) {f}  [HDU{j}]:")
         for attr in attributes:
             if attr in hdu.header:
                 print(f"\t    {attr} = {hdu.header[attr]}")
